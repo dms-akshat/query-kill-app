@@ -9,11 +9,9 @@ import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
-// Mock host data - replace with actual data source if needed
 const hosts = [
   { value: 'localhost', label: 'Localhost (MySQL)' },
   { value: '127.0.0.1', label: '127.0.0.1 (MySQL)' },
-  // Add more hosts as needed
 ];
 
 function QueryKillerForm() {
@@ -21,15 +19,15 @@ function QueryKillerForm() {
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
   const [query, setQuery] = useState('');
-  const [killedByUser, setKilledByUser] = useState(''); // New state for Killed By User
+  const [killedByUser, setKilledByUser] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setMessage(''); // Clear previous messages
-    setError('');   // Clear previous errors
+    setMessage('');
+    setError('');
     setLoading(true);
 
     if (!host) {
@@ -47,7 +45,7 @@ function QueryKillerForm() {
       setLoading(false);
       return;
     }
-    if (!killedByUser.trim()) { // Validation for Killed By User
+    if (!killedByUser.trim()) {
       setError('Please enter the "Killed By User" value.');
       setLoading(false);
       return;
@@ -64,7 +62,7 @@ function QueryKillerForm() {
           user, 
           password, 
           query, 
-          killed_by_user: killedByUser // Include killedByUser in the payload
+          killed_by_user: killedByUser
         }),
       });
 
@@ -73,43 +71,29 @@ function QueryKillerForm() {
       // Initial setMessage and setError done at the top of handleSubmit
 
       if (!response.ok) {
-        // Handles HTTP errors (e.g., 500, 400 from server itself, or if server relays script's error status as HTTP error)
-        // responseData might contain { status: "...", message: "..." } from the backend's error handling
-        setError(responseData.message || `HTTP error! status: ${response.status}`);
-        // setMessage(''); // Already cleared at the start, but good for clarity if this block was standalone
+        throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      if (responseData.status === 'success') {
+        setMessage(
+          `Successfully killed query.\n` +
+          `PID: ${responseData.pid}\n` +
+          `User: ${responseData.user}\n` +
+          `Host: ${responseData.host}\n` +
+          `Database: ${responseData.db || 'N/A'}\n` +
+          `Killed Query: ${responseData.killed_query}\n` +
+          `Message: ${responseData.message}`
+        );
+      } else if (responseData.status === 'not_found') {
+        setMessage(responseData.message);
+      } else if (responseData.status === 'success_with_output_issue' || responseData.status === 'success_no_output') {
+        setMessage(responseData.message || 'Operation reported success but with output issues.');
+      } else if (responseData.message) {
+        setMessage(responseData.message);
       } else {
-        // HTTP response is OK (2xx), now check responseData.status from our script's JSON output
-        if (responseData.status === 'success') {
-          setError(''); // Clear any prior error
-          const successMsg = `Successfully killed query.\n` +
-                            `PID: ${responseData.pid}\n` +
-                            `User: ${responseData.user}\n` +
-                            `Host: ${responseData.host}\n` +
-                            `Database: ${responseData.db || 'N/A'}\n` +
-                            `Killed Query: ${responseData.killed_query}\n` +
-                            `Message: ${responseData.message}`;
-          setMessage(successMsg);
-        } else if (responseData.status === 'not_found') {
-          setError(''); // Clear any prior error
-          setMessage(responseData.message); // This is an informational message
-        } else if (responseData.status === 'connection_error' || 
-                   responseData.status === 'error' || 
-                   responseData.status === 'argument_error' ||
-                   responseData.status === 'mysql_log_error') { // 'sqlite_error' removed from condition
-          // These are errors reported by the script/backend within a 2xx HTTP response's JSON
-          setMessage(''); // Clear any prior message
-          const detailedError = responseData.message || 'An operational error occurred.';
-          // Nested 'if' block for special formatting of sqlite_error/mysql_log_error is removed.
-          setError(detailedError);
-        } else {
-          // Handles other statuses e.g. 'success_with_output_issue', 'success_no_output', or any unexpected status
-          setError(''); // Clear any prior error
-          setMessage(responseData.message || 'Received an unexpected server response.'); // Default to informational
-        }
+        setMessage('Query processed successfully by the server.');
       }
     } catch (err) {
-      // This catches network errors or if `response.json()` fails, or if `throw new Error` was used for !response.ok
-      setMessage(''); // Clear any prior message
       setError(err.message || 'Failed to process query. Make sure the backend server is running and accessible.');
     } finally {
       setLoading(false);
@@ -173,7 +157,6 @@ function QueryKillerForm() {
         sx={{ mb: 2 }}
       />
 
-      {/* New TextField for Killed By User */}
       <TextField
         margin="normal"
         required
@@ -191,12 +174,7 @@ function QueryKillerForm() {
           gutterBottom 
           sx={{ 
             whiteSpace: 'pre-wrap',
-            color: message.startsWith("Successfully killed query.") 
-                   || message.startsWith("Successfully sent KILL command for PID") // Keep old check for broader compatibility if needed
-                   ? 'green' 
-                   : 'blue'
-            // Using theme colors like theme.palette.success.main or theme.palette.info.main would be more robust
-            // but direct color names 'green' and 'blue' are used as per current instructions.
+            color: 'green'
           }}
         >
           {message}

@@ -1,27 +1,17 @@
-# Prerequisites:
-# The MySQL user specified for this script needs:
-# 1. PROCESS privilege on the server to run SHOW FULL PROCESSLIST.
-# 2. SUPER or CONNECTION_ADMIN privilege to KILL queries/processes.
-# 3. INSERT privilege on the `{logging_db_name}.killed_queries_log` table.
-#    (The table is assumed to exist as per schema.sql or schema.mysql.sql)
-
 import mysql.connector
 import sys
 import argparse
 import json
 
-# log_to_mysql function definition:
 def log_to_mysql(cnx, pid, query_text, host, user, db_name_from_process, killed_by_user_arg, logging_db_name_arg):
     try:
         log_cursor = cnx.cursor()
-        # Use backticks for database and table names for safety
         sql = f"INSERT INTO `{logging_db_name_arg}`.`killed_queries_log` (pid, query_text, host, user, database_name, killed_by_user) VALUES (%s, %s, %s, %s, %s, %s)"
         log_data = (pid, query_text, host, user, db_name_from_process, killed_by_user_arg)
         log_cursor.execute(sql, log_data)
-        cnx.commit() # Commit on the main connection object
+        cnx.commit()
         log_cursor.close()
     except mysql.connector.Error as log_err:
-        # Output this error to stderr so it doesn't interfere with primary JSON output on stdout
         print(f"MySQL Logging Error: Failed to log killed query PID {pid} to MySQL table `{logging_db_name_arg}`.`killed_queries_log`: {log_err}", file=sys.stderr)
 
 def find_and_kill_query(host, user, password, query_text_to_find, killed_by_user_arg, logging_db_name_arg, initial_db_name_arg):
@@ -37,22 +27,22 @@ def find_and_kill_query(host, user, password, query_text_to_find, killed_by_user
         processes = cursor.fetchall()
         found_pid = None
         killed_query_details = {}
-
+        query_text_to_find = query_text_to_find.rstrip(';')
         for proc in processes:
-            # Ensure proc['Info'] is not None before calling lower() or 'in'
-            # Also check 'Command' field to ensure it's a 'Query'
+            # check 'Command' field to ensure it's a 'Query'
             if proc.get('Info') and query_text_to_find.lower() in proc['Info'].lower() and proc.get('Command') == 'Query':
-                # Avoid killing the process running "SHOW FULL PROCESSLIST" itself if it matches
+                # Avoid killing the process running "SHOW FULL PROCESSLIST" itself
                 if "show full processlist" not in proc['Info'].lower():
                     found_pid = proc.get('Id')
-                    killed_query_details = proc # Store the whole dict for later use
+                    killed_query_details = proc
                     break
         
         if found_pid:
             try:
-                kill_query_sql = f"KILL {found_pid};"
+                kill_query_sql = f"KILL QUERY {found_pid};"
                 cursor.execute(kill_query_sql)
-                # KILL successful, now log using the main connection
+                cursor.close()
+
                 log_to_mysql(cnx, found_pid, killed_query_details.get('Info'), killed_query_details.get('Host'), 
                              killed_query_details.get('User'), killed_query_details.get('db'), 
                              killed_by_user_arg, logging_db_name_arg)
