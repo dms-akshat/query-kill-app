@@ -21,14 +21,15 @@ function QueryKillerForm() {
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
   const [query, setQuery] = useState('');
+  const [killedByUser, setKilledByUser] = useState(''); // New state for Killed By User
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setMessage('');
-    setError('');
+    setMessage(''); // Clear previous messages
+    setError('');   // Clear previous errors
     setLoading(true);
 
     if (!host) {
@@ -41,31 +42,70 @@ function QueryKillerForm() {
       setLoading(false);
       return;
     }
-    // Password can be empty, so no strict validation for it.
     if (!query.trim()) {
       setError('Please enter a SQL query to find and kill.');
       setLoading(false);
       return;
     }
+    if (!killedByUser.trim()) { // Validation for Killed By User
+      setError('Please enter the "Killed By User" value.');
+      setLoading(false);
+      return;
+    }
 
     try {
-      const response = await fetch('http://localhost:3001/api/kill-query', { // Assuming backend is on port 3001
+      const response = await fetch('http://localhost:3001/api/kill-query', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ host, user, password, query }),
+        body: JSON.stringify({ 
+          host, 
+          user, 
+          password, 
+          query, 
+          killed_by_user: killedByUser // Include killedByUser in the payload
+        }),
       });
 
       const responseData = await response.json();
 
       if (!response.ok) {
+        // Prioritize message from responseData if available
         throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
       }
 
-      setMessage(responseData.message || 'Query processed successfully.');
-      // setQuery(''); // Optionally clear query field on success
+      // Handle detailed responses based on responseData.status
+      if (responseData.status === 'success') {
+        setMessage(
+          `Successfully killed query.\n` +
+          `PID: ${responseData.pid}\n` +
+          `User: ${responseData.user}\n` +
+          `Host: ${responseData.host}\n` +
+          `Database: ${responseData.db || 'N/A'}\n` +
+          `Killed Query: ${responseData.killed_query}\n` +
+          `Message: ${responseData.message}`
+        );
+      } else if (responseData.status === 'not_found') {
+        setMessage(responseData.message);
+      } else if (responseData.status === 'success_with_output_issue' || responseData.status === 'success_no_output') {
+        setMessage(responseData.message || 'Operation reported success but with output issues.');
+      } else if (responseData.status === 'sqlite_error') {
+        let errMessage = `Killed query, but failed to log: ${responseData.message}`;
+        if(responseData.pid) { // If PID is available in the sqlite_error response
+            errMessage += `\n(PID: ${responseData.pid}, Query: ${responseData.killed_query || 'N/A'})`;
+        }
+        setError(errMessage);
+      } else if (responseData.message) { // Fallback for other successful responses with a message
+        setMessage(responseData.message);
+      } else { // Generic success if no specific status or message
+        setMessage('Query processed successfully by the server.');
+      }
+      // Optionally clear query or other fields on success
+      // setQuery('');
+      // setKilledByUser('');
     } catch (err) {
+      // err.message might already be set from `throw new Error` above for !response.ok
       setError(err.message || 'Failed to process query. Make sure the backend server is running and accessible.');
     } finally {
       setLoading(false);
@@ -126,6 +166,19 @@ function QueryKillerForm() {
         rows={4}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        sx={{ mb: 2 }}
+      />
+
+      {/* New TextField for Killed By User */}
+      <TextField
+        margin="normal"
+        required
+        fullWidth
+        id="killedByUser"
+        label="Killed By User (Your Name/ID)"
+        name="killedByUser"
+        value={killedByUser}
+        onChange={(e) => setKilledByUser(e.target.value)}
         sx={{ mb: 2 }}
       />
 
