@@ -183,7 +183,18 @@ function QueryKillerForm() {
       />
 
       {message && (
-        <Typography color="primary" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
+        <Typography 
+          gutterBottom 
+          sx={{ 
+            whiteSpace: 'pre-wrap',
+            color: message.startsWith("Successfully killed query.") 
+                   || message.startsWith("Successfully sent KILL command for PID") // Keep old check for broader compatibility if needed
+                   ? 'green' 
+                   : 'blue'
+            // Using theme colors like theme.palette.success.main or theme.palette.info.main would be more robust
+            // but direct color names 'green' and 'blue' are used as per current instructions.
+          }}
+        >
           {message}
         </Typography>
       )}
