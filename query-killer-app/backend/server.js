@@ -25,7 +25,7 @@ app.post('/api/kill-query', (req, res) => {
   // Arguments for the Python script
   // IMPORTANT: In a real app, manage passwords securely (e.g., env variables, vault)
   // and consider security implications of passing credentials like this.
-  const scriptArgs = [host, user, password || '', query];
+  const scriptArgs = ['--host', host, user, password || '', query];
 
   console.log(`Executing Python script: ${scriptPath} with args: ${scriptArgs.map(arg => arg.includes(' ') ? `"${arg}"` : arg).join(' ')}`);
 
