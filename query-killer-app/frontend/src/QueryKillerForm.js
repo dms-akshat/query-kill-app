@@ -21,6 +21,7 @@ function QueryKillerForm() {
   const [query, setQuery] = useState('');
   const [killedByUser, setKilledByUser] = useState('');
   const [message, setMessage] = useState('');
+  const [messageColor, setMessageColor] = useState('green');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -68,11 +69,18 @@ function QueryKillerForm() {
 
       const responseData = await response.json();
 
-      // Initial setMessage and setError done at the top of handleSubmit
-
       if (!response.ok) {
         throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
       }
+
+      let color = 'green';
+      if (responseData.exit_code === 2) {
+        color = 'orange';
+      } else if (responseData.exit_code !== 0) {
+        color = 'red';
+      }
+
+      setMessageColor(color);
 
       if (responseData.status === 'success') {
         setMessage(
@@ -174,7 +182,7 @@ function QueryKillerForm() {
           gutterBottom 
           sx={{ 
             whiteSpace: 'pre-wrap',
-            color: 'green'
+            color: messageColor
           }}
         >
           {message}
