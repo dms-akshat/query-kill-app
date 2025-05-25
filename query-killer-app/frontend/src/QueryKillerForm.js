@@ -21,7 +21,7 @@ function QueryKillerForm() {
   const [query, setQuery] = useState('');
   const [killedByUser, setKilledByUser] = useState('');
   const [message, setMessage] = useState('');
-  const [messageColor, setMessageColor] = useState('green');
+  const [messageColor, setMessageColor] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -94,12 +94,12 @@ function QueryKillerForm() {
         );
       } else if (responseData.status === 'not_found') {
         setMessage(responseData.message);
-      } else if (responseData.status === 'success_with_output_issue' || responseData.status === 'success_no_output') {
-        setMessage(responseData.message || 'Operation reported success but with output issues.');
-      } else if (responseData.message) {
+      } else if (responseData.status === 'error') {
+        setMessage(responseData.message);
+      } else if (responseData.status === 'argument_error') {
         setMessage(responseData.message);
       } else {
-        setMessage('Query processed successfully by the server.');
+        setMessage('Unsuccessful');
       }
     } catch (err) {
       setError(err.message || 'Failed to process query. Make sure the backend server is running and accessible.');

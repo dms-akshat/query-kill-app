@@ -12,7 +12,7 @@ app.post('/api/kill-query', (req, res) => {
 
   const scriptPath = path.join(__dirname, '..', 'scripts', 'kill_mysql_query.py');
   const args = [
-    host, user, password || '', query,
+    host, user, password || '', query, 
     '--killed_by_user', killed_by_user
   ];
 
@@ -29,28 +29,17 @@ app.post('/api/kill-query', (req, res) => {
     stdout += data.toString();
   });
 
-  process.stdout.on('data', (data) => {
+  process.stderr.on('data', (data) => {
     stderr += data.toString();
   });
 
-  
   process.on('close', (code) => {
-    try {
-      const jsonResponse = JSON.parse(stdout || '{}');
-      jsonResponse.exit_code = code;
-      res.status(200).json(jsonResponse);
-    } catch (err) {
-      res.status(500).json({
-        status: 'error',
-        message: 'Failed to parse script output.',
-        exit_code: code,
-        stderr,
-        stdout,
-      });
-    }
+    const jsonResponse = JSON.parse(stdout || '{}');
+    jsonResponse.exit_code = code;
+    res.status(200).json(jsonResponse);
   });
 });
 
 app.listen(3001, () => {
-  console.log('Server started');
+  console.log('Server started on port 3001');
 });
