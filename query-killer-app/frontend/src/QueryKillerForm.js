@@ -23,40 +23,32 @@ function QueryKillerForm() {
   const [query, setQuery] = useState('');
   const [killedByUser, setKilledByUser] = useState(''); // New state for Killed By User
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState(''); // New state for message type
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage(''); // Clear previous messages
-    setMessageType(''); // Clear previous message type
+    setError('');   // Clear previous errors
     setLoading(true);
 
     if (!host) {
-      // setError('Please select a host.'); // Old way
-      setMessage('Please select a host.');
-      setMessageType('error');
+      setError('Please select a host.');
       setLoading(false);
       return;
     }
     if (!user.trim()) {
-      // setError('Please enter a MySQL username.'); // Old way
-      setMessage('Please enter a MySQL username.');
-      setMessageType('error');
+      setError('Please enter a MySQL username.');
       setLoading(false);
       return;
     }
     if (!query.trim()) {
-      // setError('Please enter a SQL query to find and kill.'); // Old way
-      setMessage('Please enter a SQL query to find and kill.');
-      setMessageType('error');
+      setError('Please enter a SQL query to find and kill.');
       setLoading(false);
       return;
     }
     if (!killedByUser.trim()) { // Validation for Killed By User
-      // setError('Please enter the "Killed By User" value.'); // Old way
-      setMessage('Please enter the "Killed By User" value.');
-      setMessageType('error');
+      setError('Please enter the "Killed By User" value.');
       setLoading(false);
       return;
     }
@@ -78,18 +70,17 @@ function QueryKillerForm() {
 
       const responseData = await response.json();
 
-      // Initial setMessage and setMessageType done at the top of handleSubmit
+      // Initial setMessage and setError done at the top of handleSubmit
 
       if (!response.ok) {
         // Handles HTTP errors (e.g., 500, 400 from server itself, or if server relays script's error status as HTTP error)
         // responseData might contain { status: "...", message: "..." } from the backend's error handling
-        // setError(responseData.message || `HTTP error! status: ${response.status}`); // Old way
-        setMessage(responseData.message || `HTTP error! status: ${response.status}`);
-        setMessageType('error');
+        setError(responseData.message || `HTTP error! status: ${response.status}`);
+        // setMessage(''); // Already cleared at the start, but good for clarity if this block was standalone
       } else {
         // HTTP response is OK (2xx), now check responseData.status from our script's JSON output
         if (responseData.status === 'success') {
-          // setError(''); // Old way
+          setError(''); // Clear any prior error
           const successMsg = `Successfully killed query.\n` +
                             `PID: ${responseData.pid}\n` +
                             `User: ${responseData.user}\n` +
@@ -98,41 +89,28 @@ function QueryKillerForm() {
                             `Killed Query: ${responseData.killed_query}\n` +
                             `Message: ${responseData.message}`;
           setMessage(successMsg);
-          setMessageType('success');
         } else if (responseData.status === 'not_found') {
-          // setError(''); // Old way
+          setError(''); // Clear any prior error
           setMessage(responseData.message); // This is an informational message
-          setMessageType('info');
         } else if (responseData.status === 'connection_error' || 
                    responseData.status === 'error' || 
                    responseData.status === 'argument_error' ||
-                   responseData.status === 'sqlite_error' || // Keep handling for this if backend might still send it
-                   responseData.status === 'mysql_log_error') { // Or if backend puts logging error in main status
+                   responseData.status === 'mysql_log_error') { // 'sqlite_error' removed from condition
           // These are errors reported by the script/backend within a 2xx HTTP response's JSON
-          // setMessage(''); // Old way
-          let detailedErrorMsg = responseData.message || 'An operational error occurred.';
-          if (responseData.status === 'sqlite_error' || responseData.status === 'mysql_log_error') {
-            detailedErrorMsg = `Operation may have completed, but logging failed: ${responseData.message}`;
-            if(responseData.pid) { 
-                detailedErrorMsg += `\n(PID: ${responseData.pid}, Query: ${responseData.killed_query || 'N/A'})`;
-            }
-          }
-          // setError(detailedErrorMsg); // Old way
-          setMessage(detailedErrorMsg);
-          setMessageType('error');
+          setMessage(''); // Clear any prior message
+          const detailedError = responseData.message || 'An operational error occurred.';
+          // Nested 'if' block for special formatting of sqlite_error/mysql_log_error is removed.
+          setError(detailedError);
         } else {
           // Handles other statuses e.g. 'success_with_output_issue', 'success_no_output', or any unexpected status
-          // setError(''); // Old way
+          setError(''); // Clear any prior error
           setMessage(responseData.message || 'Received an unexpected server response.'); // Default to informational
-          setMessageType('info');
         }
       }
     } catch (err) {
       // This catches network errors or if `response.json()` fails, or if `throw new Error` was used for !response.ok
-      // setMessage(''); // Old way
-      // setError(err.message || 'Failed to process query. Make sure the backend server is running and accessible.'); // Old way
-      setMessage(err.message || 'Failed to process query. Make sure the backend server is running and accessible.');
-      setMessageType('error');
+      setMessage(''); // Clear any prior message
+      setError(err.message || 'Failed to process query. Make sure the backend server is running and accessible.');
     } finally {
       setLoading(false);
     }
@@ -208,21 +186,27 @@ function QueryKillerForm() {
         sx={{ mb: 2 }}
       />
 
-      {message && messageType && ( // Ensure both message text and type are set
+      {message && (
         <Typography 
           gutterBottom 
           sx={{ 
             whiteSpace: 'pre-wrap',
-            color: messageType === 'success' ? 'green' :
-                   messageType === 'info'    ? 'blue'  :
-                   messageType === 'error'   ? 'red'   : // Default to red if type is 'error'
-                   'inherit' // Fallback color, though messageType should always be one of the above
+            color: message.startsWith("Successfully killed query.") 
+                   || message.startsWith("Successfully sent KILL command for PID") // Keep old check for broader compatibility if needed
+                   ? 'green' 
+                   : 'blue'
+            // Using theme colors like theme.palette.success.main or theme.palette.info.main would be more robust
+            // but direct color names 'green' and 'blue' are used as per current instructions.
           }}
         >
           {message}
         </Typography>
       )}
-      {/* The {error && ...} block was removed in a previous step (Turn 51) */}
+      {error && (
+        <Typography color="error" gutterBottom sx={{ whiteSpace: 'pre-wrap' }}>
+          {error}
+        </Typography>
+      )}
 
       <Box sx={{ position: 'relative', mt: 3, mb: 2 }}>
         <Button
