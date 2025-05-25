@@ -17,13 +17,16 @@ def find_and_kill_query(host, user, password, query_text_to_find):
         cursor.execute("SHOW FULL PROCESSLIST;")
         processes = cursor.fetchall()
 
+        # Normalize the query text by removing a trailing semicolon
+        normalized_query_text_to_find = query_text_to_find.rstrip(';')
+
         found_pid = None
         target_proc_details = None
         for proc in processes:
             # proc['Info'] contains the query text or command
             # proc['User'] and proc['Host'] can also be checked if needed
             # We are looking for queries, not sleep processes or system processes
-            if proc['Info'] and query_text_to_find.lower() in proc['Info'].lower() and proc['Command'] == 'Query':
+            if proc['Info'] and normalized_query_text_to_find.lower() in proc['Info'].lower() and proc['Command'] == 'Query':
                 # Avoid killing the process running "SHOW FULL PROCESSLIST" itself if it matches
                 if "show full processlist" not in proc['Info'].lower():
                     found_pid = proc['Id']
@@ -50,7 +53,7 @@ def find_and_kill_query(host, user, password, query_text_to_find):
                     print(f"Error trying to kill query PID {found_pid}: {kill_err}", file=sys.stderr)
                 sys.exit(1) # Exit with error if kill fails or specific info message for 1094
         else:
-            print(f"No active query found matching: '{query_text_to_find}'", file=sys.stdout)
+            print(f"No active query found matching: '{normalized_query_text_to_find}' (original input: '{query_text_to_find}')", file=sys.stdout)
 
     except mysql.connector.Error as err:
         print(f"Error: Could not connect to MySQL host '{host}'. Please check the hostname, port, and that the MySQL server is running. Details: {err}", file=sys.stderr)
